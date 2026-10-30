@@ -15,4 +15,8 @@ export default defineConfig({
     host: true,
     allowedHosts: true,
   },
+  build: {
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000,
+  },
 });

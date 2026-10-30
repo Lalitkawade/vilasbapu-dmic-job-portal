@@ -28,8 +28,15 @@ export const AdminNavbar: React.FC = () => {
           {/* Logo & Portal Info */}
           <div className="flex items-center gap-3">
             <Link to="/admin/dashboard" className="flex items-center gap-2.5">
-              <div className="p-2 bg-navy-800 rounded-lg border border-navy-700 text-saffron-400">
-                <Shield className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-full bg-white p-0.5 border border-saffron-400/80 shadow-xs flex items-center justify-center overflow-hidden shrink-0">
+                <img 
+                  src="/dmic-logo.png" 
+                  alt="DMIC Logo" 
+                  className="w-full h-full object-contain rounded-full"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/images/DMIC Logo.png';
+                  }}
+                />
               </div>
               <div>
                 <span className="font-bold text-base tracking-wide flex items-center gap-2">

@@ -37,13 +37,6 @@ export const AdminLoginPage: React.FC = () => {
     }
   };
 
-  // Quick fill demo administrator credentials
-  const fillDemoAdmin = () => {
-    setEmail('admin@bidkin-portal.gov.in');
-    setPassword('Admin@12345');
-    setError(null);
-  };
-
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-elevated border border-slate-200 overflow-hidden">
@@ -76,9 +69,10 @@ export const AdminLoginPage: React.FC = () => {
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="admin@office.in"
+                  placeholder="administrator@constituency.gov.in"
                   className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-navy-600 text-xs"
                 />
               </div>
@@ -93,6 +87,7 @@ export const AdminLoginPage: React.FC = () => {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -111,7 +106,7 @@ export const AdminLoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-navy-800 hover:bg-navy-700 text-white font-semibold py-2.5 rounded-lg transition shadow flex items-center justify-center gap-2"
+              className="w-full bg-navy-800 hover:bg-navy-700 active:scale-98 text-white font-semibold py-2.5 rounded-lg transition shadow flex items-center justify-center gap-2 cursor-pointer"
             >
               {isLoading ? (
                 <>
@@ -127,17 +122,12 @@ export const AdminLoginPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Quick Demo Credentials Fill for Testing / Review */}
+          {/* Security Notice for Authorized Personnel */}
           <div className="pt-4 border-t border-slate-100 text-center">
-            <button
-              type="button"
-              onClick={fillDemoAdmin}
-              className="text-xs text-saffron-600 hover:text-saffron-700 font-semibold underline"
-            >
-              {language === 'mr' ? 'डेमो प्रशासक क्रेडेंशियल्स भरा' : 'Auto-fill Authorized Demo Admin Credentials'}
-            </button>
-            <p className="text-[11px] text-slate-400 mt-1">
-              admin@bidkin-portal.gov.in / Admin@12345
+            <p className="text-[11px] text-slate-500 font-medium">
+              {language === 'mr' 
+                ? 'हे पोर्टल केवळ अधिकृत कार्यालयीन कर्मचाऱ्यांसाठी सुरक्षित आहे.' 
+                : 'Access is restricted to authorized constituency office personnel.'}
             </p>
           </div>
         </div>

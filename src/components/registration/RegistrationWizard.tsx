@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { 
@@ -18,7 +18,7 @@ import {
   getItemLabel,
   getItemsLabels
 } from '../../data/catalogData';
-import { BIDKIN_VILLAGES, TALUKAS } from '../../data/villagesData';
+import { BIDKIN_VILLAGES, TALUKAS, getVillagesByTaluka, getTalukaObject } from '../../data/villagesData';
 import { submitCandidateRegistration } from '../../lib/supabase';
 import { 
   User, 
@@ -48,72 +48,74 @@ export const RegistrationWizard: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
+  const [honeypot, setHoneypot] = useState<string>('');
+  const lastSubmitTimeRef = React.useRef<number>(0);
 
-  // Form State
+  // Form State - all fields start blank with no pre-filled defaults
   const [formData, setFormData] = useState({
     // Section A: Personal
     full_name: '',
     mobile_number: '',
     alternate_mobile_number: '',
-    age: 22,
-    village: 'बिडकीन (Bidkin)',
+    age: '' as unknown as number,
+    village: '',
     custom_village: '',
-    taluka: 'पैठण',
-    district: 'Chhatrapati Sambhajinagar',
-    pin_code: '431105',
+    taluka: '',
+    district: '',
+    pin_code: '',
     current_location: '',
     willing_to_commute: true,
     willing_to_relocate: false,
 
     // Section B: Education
-    highest_qualification_id: 'iti',
+    highest_qualification_id: '',
     qualification_specialization: '',
-    passing_year: new Date().getFullYear() - 2,
+    passing_year: '' as unknown as number,
     additional_qualifications: '',
     certifications_text: '',
     professional_licenses: '',
-    computer_proficiency_id: 'basic',
+    computer_proficiency_id: '',
 
     // Section C: Employment Levels
-    employment_level_ids: ['operator', 'technician'] as string[],
+    employment_level_ids: [] as string[],
 
     // Section D: Job Roles
-    job_role_ids: ['role_machine_op', 'role_fitter_fabricator'] as string[],
+    job_role_ids: [] as string[],
 
     // Section E: Skills
-    skill_ids: ['skill_machine_op', 'skill_fitting'] as string[],
+    skill_ids: [] as string[],
     other_skills: [] as string[],
     new_other_skill: '',
 
     // Section F: Experience
     experience_category: 'fresher' as 'fresher' | 'experienced' | 'apprentice',
-    total_experience_band: 'no_experience',
+    total_experience_band: '',
     total_experience_months: 0,
     previous_designation: '',
     previous_industry_id: '',
     previous_employer: '',
     relevant_skills_gained: '',
     previous_responsibilities: '',
-    notice_period_id: 'notice_immediate',
+    notice_period_id: '',
     earliest_joining_date: '',
 
     // Section G: Industries
-    industry_ids: ['ind_auto', 'ind_general_mfg'] as string[],
+    industry_ids: [] as string[],
 
     // Section H: Preferences
-    expected_salary_band_id: '15k_20k',
-    employment_type_id: 'permanent',
-    shift_preference_id: 'rotational_shift',
-    joining_availability_id: 'immediately',
-    preferred_work_location: 'Bidkin / Paithan / Shendra',
-    willing_overtime: true,
-    languages: ['Marathi', 'Hindi'],
+    expected_salary_band_id: '',
+    employment_type_id: '',
+    shift_preference_id: '',
+    joining_availability_id: '',
+    preferred_work_location: '',
+    willing_overtime: false,
+    languages: [] as string[],
 
     // Section I: Resume
     resume_file: null as File | null,
 
     // Section J: Consent
-    consent_given: true,
+    consent_given: false,
   });
 
   // Filter searches
@@ -121,6 +123,25 @@ export const RegistrationWizard: React.FC = () => {
   const [skillSearch, setSkillSearch] = useState('');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('all');
   const [villageSearch, setVillageSearch] = useState('');
+
+  // Dynamically filtered villages based on the selected Taluka
+  const currentTalukaVillages = useMemo(() => {
+    return getVillagesByTaluka(formData.taluka);
+  }, [formData.taluka]);
+
+  // Handle taluka change: dynamically update taluka and reset village so candidate can select their village
+  const handleTalukaChange = (newTaluka: string) => {
+    setFormData(prev => ({
+      ...prev,
+      taluka: newTaluka,
+      village: '',
+      custom_village: '',
+      district: prev.district || (newTaluka && newTaluka !== 'इतर तालुका' && newTaluka !== 'Other Taluka' 
+        ? (language === 'mr' ? 'छत्रपती संभाजीनगर' : 'Chhatrapati Sambhajinagar') 
+        : prev.district),
+    }));
+    setVillageSearch('');
+  };
 
   // Step Completion Checkers
   const isStepComplete = (stepNum: number): boolean => {
@@ -130,17 +151,32 @@ export const RegistrationWizard: React.FC = () => {
         const nameValid = Boolean(formData.full_name && formData.full_name.trim().length >= 3);
         const mobileValid = cleanMobile.length === 10 && /^[6-9]/.test(cleanMobile);
         const ageValid = Boolean(formData.age && formData.age >= 18 && formData.age <= 75);
-        const villageValid = Boolean(formData.village && (!formData.village.includes('Other') || formData.custom_village));
-        return nameValid && mobileValid && ageValid && villageValid;
+        const talukaValid = Boolean(formData.taluka && formData.taluka.trim().length >= 2);
+        const villageValid = Boolean(
+          formData.village && 
+          (!formData.village.includes('Other') && !formData.village.includes('इतर') || formData.custom_village)
+        );
+        return nameValid && mobileValid && ageValid && talukaValid && villageValid;
       }
       case 2:
         return Boolean(formData.highest_qualification_id);
       case 3:
         return formData.employment_level_ids.length > 0;
       case 4:
-        return true; // Skills & Industries can be customized freely
+        return Boolean(
+          formData.skill_ids.length > 0 || 
+          formData.other_skills.length > 0 || 
+          formData.industry_ids.length > 0
+        );
       case 5:
-        return true; // Salary & Shift preferences have pre-filled options
+        return Boolean(
+          formData.expected_salary_band_id || 
+          formData.employment_type_id || 
+          formData.shift_preference_id || 
+          formData.joining_availability_id || 
+          formData.total_experience_band ||
+          formData.preferred_work_location
+        );
       case 6:
         return Boolean(formData.consent_given);
       default:
@@ -172,7 +208,13 @@ export const RegistrationWizard: React.FC = () => {
         message: language === 'mr' ? 'पायरी १: उमेदवाराचे वय १८ ते ७० वर्षे असणे आवश्यक आहे.' : 'Step 1: Candidate age must be between 18 and 70.'
       });
     }
-    if (!formData.village || (formData.village.includes('Other') && !formData.custom_village)) {
+    if (!formData.taluka || formData.taluka.trim().length < 2) {
+      errors.push({
+        step: 1,
+        message: language === 'mr' ? 'पायरी १: कृपया आपला तालुका निवडा.' : 'Step 1: Please select your taluka.'
+      });
+    }
+    if (!formData.village || ((formData.village.includes('Other') || formData.village.includes('इतर')) && !formData.custom_village)) {
       errors.push({
         step: 1,
         message: language === 'mr' ? 'पायरी १: कृपया आपले गाव किंवा शहर निवडा / लिहा.' : 'Step 1: Please specify your village or town.'
@@ -257,9 +299,9 @@ export const RegistrationWizard: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate 5 MB
-      if (file.size > 5 * 1024 * 1024) {
-        setErrorMessage(language === 'mr' ? 'रेझ्युमे फाईलचा आकार ५ MB पेक्षा कमी असावा.' : 'Resume file size must be less than 5 MB.');
+      // Validate 1 MB
+      if (file.size > 1 * 1024 * 1024) {
+        setErrorMessage(language === 'mr' ? 'रेझ्युमे फाईलचा आकार १ MB पेक्षा कमी असावा.' : 'Resume file size must be less than 1 MB.');
         return;
       }
       // Validate extensions
@@ -274,6 +316,21 @@ export const RegistrationWizard: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    // 1. Anti-bot honeypot check: block automated scrapers and spam bots
+    if (honeypot) {
+      console.warn('Bot submission blocked via security honeypot');
+      setErrorMessage(language === 'mr' ? 'स्वयंचलित नोंदणी ब्लॉक केली गेली आहे.' : 'Automated submission blocked.');
+      return;
+    }
+
+    // 2. Client-side rate-limiting / cooldown check (minimum 4 seconds between submission attempts)
+    const now = Date.now();
+    if (now - lastSubmitTimeRef.current < 4000) {
+      setErrorMessage(language === 'mr' ? 'कृपया काही सेकंद थांबा आणि पुन्हा प्रयत्न करा.' : 'Please wait a few seconds before trying again.');
+      return;
+    }
+    lastSubmitTimeRef.current = now;
+
     const errors = getValidationErrors();
     if (errors.length > 0) {
       setErrorMessage(errors[0].message);
@@ -297,7 +354,7 @@ export const RegistrationWizard: React.FC = () => {
         age: Number(formData.age),
         village: actualVillage,
         taluka: formData.taluka,
-        district: formData.district,
+        district: formData.district || (language === 'mr' ? 'छत्रपती संभाजीनगर' : 'Chhatrapati Sambhajinagar'),
         pin_code: formData.pin_code || undefined,
         current_location: formData.current_location || undefined,
         willing_to_commute: formData.willing_to_commute,
@@ -312,7 +369,7 @@ export const RegistrationWizard: React.FC = () => {
         computer_proficiency_id: formData.computer_proficiency_id || undefined,
 
         experience_category: formData.experience_category,
-        total_experience_band: formData.total_experience_band,
+        total_experience_band: formData.total_experience_band || (formData.experience_category === 'fresher' ? 'no_experience' : 'exp_less_1'),
         total_experience_months: formData.total_experience_months || 0,
         previous_designation: formData.previous_designation || undefined,
         previous_industry_id: formData.previous_industry_id || undefined,
@@ -399,7 +456,7 @@ export const RegistrationWizard: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Exploration Banner */}
-      <div className="mb-6 bg-gradient-to-r from-navy-50 via-white to-amber-50 border border-slate-200 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+      <div className="mb-6 bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-2.5">
           <span className="shrink-0 px-2 py-0.5 rounded-md bg-saffron-500 text-white font-bold text-[10px] uppercase tracking-wider flex items-center gap-1 shadow-2xs">
             <Eye className="w-3 h-3" />
@@ -528,7 +585,20 @@ export const RegistrationWizard: React.FC = () => {
       )}
 
       {/* Step Container Card */}
-      <div className="bg-white rounded-xl shadow-card border border-slate-200 p-6 sm:p-8">
+      <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-slate-200/90 p-6 sm:p-9 transition-all">
+
+        {/* Security Bot-Trap Honeypot: Hidden from human candidates, detects automated form spam */}
+        <div style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none', height: 0, overflow: 'hidden' }} aria-hidden="true">
+          <label htmlFor="portal_sec_validation_code">Security Verification (Leave Blank)</label>
+          <input
+            id="portal_sec_validation_code"
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            value={honeypot}
+            onChange={e => setHoneypot(e.target.value)}
+          />
+        </div>
 
         {/* STEP 1: PERSONAL INFORMATION */}
         {currentStep === 1 && (
@@ -595,32 +665,88 @@ export const RegistrationWizard: React.FC = () => {
                   min={18}
                   max={70}
                   required
-                  value={formData.age}
-                  onChange={e => setFormData({ ...formData, age: Number(e.target.value) })}
+                  value={formData.age || ''}
+                  onChange={e => setFormData({ ...formData, age: e.target.value === '' ? ('' as any) : Number(e.target.value) })}
+                  placeholder={language === 'mr' ? 'उदा. २४ (वय १८ ते ७०)' : 'e.g. 24 (Age 18 to 70)'}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-navy-600 focus:border-transparent text-sm"
                 />
               </div>
 
-              {/* Village Selector with Instant Search */}
+              {/* Taluka Selector (Selected First) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                  {t('taluka')} <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.taluka}
+                  onChange={e => handleTalukaChange(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-navy-600 focus:border-transparent text-sm bg-white font-medium"
+                >
+                  <option value="">
+                    {language === 'mr' ? '-- तालुका निवडा (Select Taluka) --' : '-- Select Taluka --'}
+                  </option>
+                  {TALUKAS.map(tItem => (
+                    <option key={tItem.id} value={language === 'mr' ? tItem.name_mr : tItem.name_en}>
+                      {language === 'mr' ? tItem.name_mr : tItem.name_en}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  {formData.taluka 
+                    ? (language === 'mr' 
+                        ? `${formData.taluka} तालुका (${currentTalukaVillages.length}+ गावे उपलब्ध)` 
+                        : `${formData.taluka} Taluka (${currentTalukaVillages.length}+ villages available)`)
+                    : (language === 'mr' 
+                        ? 'छ. संभाजीनगर जिल्हा (९ तालुके)' 
+                        : 'CSN District (9 Talukas)')}
+                </span>
+              </div>
+
+              {/* District */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                  {t('district')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.district}
+                  onChange={e => setFormData({ ...formData, district: e.target.value })}
+                  placeholder={language === 'mr' ? 'उदा. छत्रपती संभाजीनगर' : 'e.g. Chhatrapati Sambhajinagar'}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-700 text-sm focus:ring-2 focus:ring-navy-600"
+                />
+              </div>
+
+              {/* Village Selector (Dynamically Relevant to Selected Taluka) */}
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-slate-700 uppercase">
-                    {t('village')} <span className="text-red-500">*</span>
+                    {t('village')} {formData.taluka ? `(${formData.taluka})` : ''} <span className="text-red-500">*</span>
                   </label>
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    {language === 'mr' ? '२४०+ पैठण मतदारसंघ गावे उपलब्ध' : '240+ Constituency Villages'}
+                  <span className="text-[11px] text-navy-700 font-semibold bg-navy-50 px-2 py-0.5 rounded border border-navy-100">
+                    {formData.taluka 
+                      ? `${currentTalukaVillages.length} ${language === 'mr' ? 'गावे उपलब्ध' : 'Villages Available'}`
+                      : (language === 'mr' ? 'प्रथम तालुका निवडा' : 'Select Taluka First')}
                   </span>
                 </div>
 
-                {/* Instant Search Bar */}
+                {/* Instant Search Bar within selected Taluka */}
                 <div className="relative mb-2">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
+                    disabled={!formData.taluka}
                     value={villageSearch}
                     onChange={e => setVillageSearch(e.target.value)}
-                    placeholder={language === 'mr' ? 'गाव शोधा (उदा. बिडकीन, आपेगाव, पिंप्री, चितेगाव, लोहगाव, पाचोड)...' : 'Search village name (e.g. Bidkin, Apegaon, Pimpri, Pachod)...'}
-                    className="w-full pl-9 pr-8 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-navy-600 focus:border-transparent bg-slate-50/70"
+                    placeholder={
+                      !formData.taluka
+                        ? (language === 'mr' ? 'प्रथम वरील तालुका निवडा...' : 'Select Taluka above first...')
+                        : (language === 'mr' 
+                            ? `${formData.taluka} तालुक्यातील गाव शोधा...` 
+                            : `Search village in ${formData.taluka}...`)
+                    }
+                    className={`w-full pl-9 pr-8 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-navy-600 focus:border-transparent ${
+                      !formData.taluka ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50/70'
+                    }`}
                   />
                   {villageSearch && (
                     <button
@@ -634,13 +760,13 @@ export const RegistrationWizard: React.FC = () => {
                 </div>
 
                 {/* Quick 1-Tap Filtered Chips when searching */}
-                {villageSearch.trim().length > 0 && (
+                {formData.taluka && villageSearch.trim().length > 0 && (
                   <div className="mb-2.5 p-2 bg-amber-50/70 border border-amber-200 rounded-lg">
                     <span className="text-[10px] font-bold uppercase text-amber-800 block mb-1.5">
                       {language === 'mr' ? 'शोधाचे निकाल (त्वरित निवडीसाठी क्लिक करा):' : 'Search Results (Tap to select):'}
                     </span>
                     <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-                      {BIDKIN_VILLAGES.filter(v => 
+                      {currentTalukaVillages.filter(v => 
                         v.name_mr.toLowerCase().includes(villageSearch.toLowerCase()) || 
                         v.name_en.toLowerCase().includes(villageSearch.toLowerCase())
                       ).slice(0, 15).map((v, i) => {
@@ -651,11 +777,10 @@ export const RegistrationWizard: React.FC = () => {
                             key={i}
                             type="button"
                             onClick={() => {
-                              setFormData({
-                                ...formData,
+                              setFormData(prev => ({
+                                ...prev,
                                 village: val,
-                                taluka: language === 'mr' ? v.taluka_mr : v.taluka_en,
-                              });
+                              }));
                               setVillageSearch('');
                             }}
                             className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition flex items-center gap-1 ${
@@ -665,7 +790,6 @@ export const RegistrationWizard: React.FC = () => {
                             }`}
                           >
                             <span>{val}</span>
-                            <span className="text-[10px] text-slate-400 font-normal">({v.taluka_mr})</span>
                           </button>
                         );
                       })}
@@ -673,67 +797,76 @@ export const RegistrationWizard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Categorized Dropdown Selector */}
+                {/* Categorized Dropdown Selector for the chosen Taluka */}
                 <select
+                  disabled={!formData.taluka}
                   value={formData.village}
                   onChange={e => {
-                    const selected = BIDKIN_VILLAGES.find(v => (language === 'mr' ? v.name_mr : v.name_en) === e.target.value);
-                    setFormData({
-                      ...formData,
+                    setFormData(prev => ({
+                      ...prev,
                       village: e.target.value,
-                      taluka: selected ? (language === 'mr' ? selected.taluka_mr : selected.taluka_en) : formData.taluka,
-                    });
+                    }));
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-navy-600 focus:border-transparent text-sm bg-white font-medium"
+                  className={`w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-navy-600 focus:border-transparent text-sm bg-white font-medium ${
+                    !formData.taluka ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''
+                  }`}
                 >
-                  <optgroup label={language === 'mr' ? '🌟 प्रमुख औद्योगिक केंद्रे (Primary & DMIC Hubs)' : '🌟 Primary & DMIC Hubs'}>
-                    {BIDKIN_VILLAGES.filter(v => v.category === 'primary').map((v, i) => (
-                      <option key={`p_${i}`} value={language === 'mr' ? v.name_mr : v.name_en}>
-                        {language === 'mr' ? v.name_mr : v.name_en} ({language === 'mr' ? v.taluka_mr : v.taluka_en})
-                      </option>
-                    ))}
-                  </optgroup>
+                  <option value="">
+                    {!formData.taluka 
+                      ? (language === 'mr' ? '-- प्रथम वरील तालुका निवडा --' : '-- Select Taluka Above First --')
+                      : (language === 'mr' ? '-- गाव निवडा (Select Village) --' : '-- Select Village --')}
+                  </option>
+                  {/* Primary Hubs in this Taluka if any */}
+                  {currentTalukaVillages.some(v => v.category === 'primary') && (
+                    <optgroup label={language === 'mr' ? `🌟 ${formData.taluka} प्रमुख केंद्रे (Primary Hubs)` : `🌟 ${formData.taluka} Primary Hubs`}>
+                      {currentTalukaVillages.filter(v => v.category === 'primary').map((v, i) => (
+                        <option key={`p_${i}`} value={language === 'mr' ? v.name_mr : v.name_en}>
+                          {language === 'mr' ? v.name_mr : v.name_en}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
 
-                  <optgroup label={language === 'mr' ? '🏛️ पिंप्री महसूल मंडळ (११०-पैठण विधानसभा)' : '🏛️ Pimpri Revenue Circle (110-Paithan)'}>
-                    {BIDKIN_VILLAGES.filter(v => v.category === 'pimpri_circle').map((v, i) => (
-                      <option key={`pc_${i}`} value={language === 'mr' ? v.name_mr : v.name_en}>
-                        {language === 'mr' ? v.name_mr : v.name_en} ({language === 'mr' ? v.taluka_mr : v.taluka_en})
-                      </option>
-                    ))}
-                  </optgroup>
+                  {/* Pimpri circle if Paithan or CSN */}
+                  {currentTalukaVillages.some(v => v.category === 'pimpri_circle') && (
+                    <optgroup label={language === 'mr' ? '🏛️ पिंप्री महसूल मंडळ (Pimpri Revenue Circle)' : '🏛️ Pimpri Revenue Circle'}>
+                      {currentTalukaVillages.filter(v => v.category === 'pimpri_circle').map((v, i) => (
+                        <option key={`pc_${i}`} value={language === 'mr' ? v.name_mr : v.name_en}>
+                          {language === 'mr' ? v.name_mr : v.name_en}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
 
-                  <optgroup label={language === 'mr' ? '📍 पैठण तालुका गावे (Paithan Taluka Villages)' : '📍 Paithan Taluka Villages'}>
-                    {BIDKIN_VILLAGES.filter(v => v.category === 'paithan' || !v.category).map((v, i) => (
-                      <option key={`pt_${i}`} value={language === 'mr' ? v.name_mr : v.name_en}>
-                        {language === 'mr' ? v.name_mr : v.name_en} ({language === 'mr' ? v.taluka_mr : v.taluka_en})
-                      </option>
-                    ))}
-                  </optgroup>
-
-                  <optgroup label={language === 'mr' ? '🏭 लगतची औद्योगिक क्षेत्रे (Industrial & Regional Hubs)' : '🏭 Industrial & Regional Hubs'}>
-                    {BIDKIN_VILLAGES.filter(v => v.category === 'industrial').map((v, i) => (
-                      <option key={`ind_${i}`} value={language === 'mr' ? v.name_mr : v.name_en}>
-                        {language === 'mr' ? v.name_mr : v.name_en} ({language === 'mr' ? v.taluka_mr : v.taluka_en})
-                      </option>
-                    ))}
-                  </optgroup>
-
-                  <optgroup label={language === 'mr' ? 'इतर (Other)' : 'Other'}>
-                    {BIDKIN_VILLAGES.filter(v => v.category === 'other').map((v, i) => (
-                      <option key={`oth_${i}`} value={language === 'mr' ? v.name_mr : v.name_en}>
+                  {/* All other villages of this Taluka */}
+                  <optgroup label={language === 'mr' ? `📍 ${formData.taluka} गावे (Villages)` : `📍 ${formData.taluka} Villages`}>
+                    {currentTalukaVillages.filter(v => v.category !== 'primary' && v.category !== 'pimpri_circle' && v.category !== 'other').map((v, i) => (
+                      <option key={`v_${i}`} value={language === 'mr' ? v.name_mr : v.name_en}>
                         {language === 'mr' ? v.name_mr : v.name_en}
                       </option>
                     ))}
                   </optgroup>
+
+                  {/* Other option */}
+                  {currentTalukaVillages.some(v => v.category === 'other') && (
+                    <optgroup label={language === 'mr' ? 'इतर (Other)' : 'Other'}>
+                      {currentTalukaVillages.filter(v => v.category === 'other').map((v, i) => (
+                        <option key={`oth_${i}`} value={language === 'mr' ? v.name_mr : v.name_en}>
+                          {language === 'mr' ? v.name_mr : v.name_en}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
 
-                {formData.village.includes('Other') && (
-                  <div className="mt-2 p-3 bg-amber-50/50 border border-amber-200 rounded-lg">
+                {(formData.village.includes('Other') || formData.village.includes('इतर') || formData.taluka.includes('Other') || formData.taluka.includes('इतर')) && (
+                  <div className="mt-2.5 p-3 bg-amber-50/70 border border-amber-200 rounded-lg">
                     <label className="block text-xs font-semibold text-amber-900 mb-1">
-                      {language === 'mr' ? 'आपल्या गाव/वाडी/तांड्याचे नाव लिहा:' : 'Type your village/hamlet/tanda name:'}
+                      {language === 'mr' ? 'आपल्या गाव/वाडी/तांड्याचे नाव लिहा:' : 'Type your village/hamlet/tanda name:'} <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
+                      required
                       placeholder={language === 'mr' ? 'उदा. नवी वस्ती, तांडा, वाडी...' : 'e.g. New Wasti, Tanda, Hamlet...'}
                       value={formData.custom_village}
                       onChange={e => setFormData({ ...formData, custom_village: e.target.value })}
@@ -741,37 +874,6 @@ export const RegistrationWizard: React.FC = () => {
                     />
                   </div>
                 )}
-              </div>
-
-              {/* Taluka */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                  {t('taluka')} <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.taluka}
-                  onChange={e => setFormData({ ...formData, taluka: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-navy-600 focus:border-transparent text-sm bg-white"
-                >
-                  {TALUKAS.map(tItem => (
-                    <option key={tItem.id} value={language === 'mr' ? tItem.name_mr : tItem.name_en}>
-                      {language === 'mr' ? tItem.name_mr : tItem.name_en}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* District */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                  {t('district')}
-                </label>
-                <input
-                  type="text"
-                  value={formData.district}
-                  onChange={e => setFormData({ ...formData, district: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-700 text-sm"
-                />
               </div>
 
               {/* PIN Code */}
@@ -883,6 +985,9 @@ export const RegistrationWizard: React.FC = () => {
                   onChange={e => setFormData({ ...formData, highest_qualification_id: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-navy-600 text-sm bg-white font-medium"
                 >
+                  <option value="">
+                    {language === 'mr' ? '-- सर्वोच्च शिक्षण निवडा (Select Qualification) --' : '-- Select Highest Qualification --'}
+                  </option>
                   {QUALIFICATIONS.map(q => (
                     <option key={q.id} value={q.id}>
                       {language === 'mr' ? q.name_mr : q.name_en}
@@ -914,9 +1019,9 @@ export const RegistrationWizard: React.FC = () => {
                   type="number"
                   min={1980}
                   max={2030}
-                  value={formData.passing_year}
-                  onChange={e => setFormData({ ...formData, passing_year: Number(e.target.value) })}
-                  placeholder={t('passingYearPlaceholder')}
+                  value={formData.passing_year || ''}
+                  onChange={e => setFormData({ ...formData, passing_year: e.target.value === '' ? ('' as any) : Number(e.target.value) })}
+                  placeholder={language === 'mr' ? 'उदा. २०२३' : 'e.g. 2023'}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm"
                 />
               </div>
@@ -959,6 +1064,9 @@ export const RegistrationWizard: React.FC = () => {
                   onChange={e => setFormData({ ...formData, computer_proficiency_id: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white"
                 >
+                  <option value="">
+                    {language === 'mr' ? '-- संगणक ज्ञान निवडा (Select) --' : '-- Select Computer Knowledge --'}
+                  </option>
                   {COMPUTER_PROFICIENCY.map(cp => (
                     <option key={cp.id} value={cp.id}>
                       {language === 'mr' ? cp.name_mr : cp.name_en}
@@ -1307,6 +1415,9 @@ export const RegistrationWizard: React.FC = () => {
                     onChange={e => setFormData({ ...formData, total_experience_band: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white"
                   >
+                    <option value="">
+                      {language === 'mr' ? '-- अनुभव कालावधी निवडा --' : '-- Select Experience Band --'}
+                    </option>
                     {EXPERIENCE_BANDS.map(eb => (
                       <option key={eb.id} value={eb.id}>
                         {language === 'mr' ? eb.name_mr : eb.name_en}
@@ -1371,6 +1482,9 @@ export const RegistrationWizard: React.FC = () => {
                         onChange={e => setFormData({ ...formData, notice_period_id: e.target.value })}
                         className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white"
                       >
+                        <option value="">
+                          {language === 'mr' ? '-- नोटीस पिरियड निवडा --' : '-- Select Notice Period --'}
+                        </option>
                         {NOTICE_PERIODS.map(np => (
                           <option key={np.id} value={np.id}>
                             {language === 'mr' ? np.name_mr : np.name_en}
@@ -1414,6 +1528,9 @@ export const RegistrationWizard: React.FC = () => {
                     onChange={e => setFormData({ ...formData, expected_salary_band_id: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white font-medium"
                   >
+                    <option value="">
+                      {language === 'mr' ? '-- अपेक्षित वेतन श्रेणी निवडा --' : '-- Select Expected Salary Band --'}
+                    </option>
                     {SALARY_BANDS.map(sb => (
                       <option key={sb.id} value={sb.id}>
                         {language === 'mr' ? sb.name_mr : sb.name_en}
@@ -1432,6 +1549,9 @@ export const RegistrationWizard: React.FC = () => {
                     onChange={e => setFormData({ ...formData, employment_type_id: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white"
                   >
+                    <option value="">
+                      {language === 'mr' ? '-- नोकरीचा प्रकार निवडा --' : '-- Select Employment Type --'}
+                    </option>
                     {EMPLOYMENT_TYPES.map(et => (
                       <option key={et.id} value={et.id}>
                         {language === 'mr' ? et.name_mr : et.name_en}
@@ -1450,6 +1570,9 @@ export const RegistrationWizard: React.FC = () => {
                     onChange={e => setFormData({ ...formData, shift_preference_id: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white"
                   >
+                    <option value="">
+                      {language === 'mr' ? '-- कामाची पाळी (Shift) निवडा --' : '-- Select Shift Preference --'}
+                    </option>
                     {SHIFT_PREFERENCES.map(sp => (
                       <option key={sp.id} value={sp.id}>
                         {language === 'mr' ? sp.name_mr : sp.name_en}
@@ -1468,6 +1591,9 @@ export const RegistrationWizard: React.FC = () => {
                     onChange={e => setFormData({ ...formData, joining_availability_id: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white"
                   >
+                    <option value="">
+                      {language === 'mr' ? '-- हजर होण्याची उपलब्धता निवडा --' : '-- Select Joining Availability --'}
+                    </option>
                     {JOINING_AVAILABILITY.map(ja => (
                       <option key={ja.id} value={ja.id}>
                         {language === 'mr' ? ja.name_mr : ja.name_en}
@@ -1485,7 +1611,7 @@ export const RegistrationWizard: React.FC = () => {
                     type="text"
                     value={formData.preferred_work_location}
                     onChange={e => setFormData({ ...formData, preferred_work_location: e.target.value })}
-                    placeholder="e.g. Bidkin, Shendra, Waluj"
+                    placeholder={language === 'mr' ? 'उदा. बिडकीन, पैठण, शेंद्रा, वाळूज' : 'e.g. Bidkin, Paithan, Shendra, Waluj'}
                     className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm"
                   />
                 </div>
@@ -1599,7 +1725,7 @@ export const RegistrationWizard: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-slate-500 block">{t('village')}:</span>
-                  <span className="font-semibold text-slate-900">{formData.village}</span>
+                  <span className="font-semibold text-slate-900">{formData.village || '—'}</span>
                 </div>
                 <div>
                   <span className="text-slate-500 block">{t('highestQualification')}:</span>
@@ -1794,11 +1920,11 @@ export const RegistrationWizard: React.FC = () => {
             </div>
             <div className="p-6 overflow-y-auto space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-200">
-                <div><span className="text-slate-400 block">{t('fullName')}:</span><strong>{formData.full_name}</strong></div>
-                <div><span className="text-slate-400 block">{t('mobileNumber')}:</span><strong>{formData.mobile_number}</strong></div>
-                <div><span className="text-slate-400 block">{t('village')}:</span><strong>{formData.village}</strong></div>
-                <div><span className="text-slate-400 block">{t('taluka')}:</span><strong>{formData.taluka}</strong></div>
-                <div><span className="text-slate-400 block">{t('age')}:</span><strong>{formData.age} years</strong></div>
+                <div><span className="text-slate-400 block">{t('fullName')}:</span><strong>{formData.full_name || '—'}</strong></div>
+                <div><span className="text-slate-400 block">{t('mobileNumber')}:</span><strong>{formData.mobile_number || '—'}</strong></div>
+                <div><span className="text-slate-400 block">{t('village')}:</span><strong>{formData.village || '—'}</strong></div>
+                <div><span className="text-slate-400 block">{t('taluka')}:</span><strong>{formData.taluka || '—'}</strong></div>
+                <div><span className="text-slate-400 block">{t('age')}:</span><strong>{formData.age ? `${formData.age} years` : '—'}</strong></div>
                 <div><span className="text-slate-400 block">{t('highestQualification')}:</span><strong>{getItemLabel(QUALIFICATIONS, formData.highest_qualification_id, language)}</strong></div>
               </div>
               <div>

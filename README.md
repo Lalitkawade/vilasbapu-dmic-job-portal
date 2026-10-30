@@ -16,7 +16,7 @@ A production-ready full-stack candidate employment registration, skill-mapping, 
   3. *Employment Levels & Roles*: Searchable multi-select covering casual labour, helper, skilled technician, supervisor, engineer, executive, and senior management across 22 industry departments.
   4. *Technical Skills & Industries*: 100+ structured skills across 6 technical categories (Mechanical, Electrical, Quality, Logistics, Computer, Management) + custom other skill entry.
   5. *Experience & Preferences*: Category (Fresher / Experienced / Apprentice), experience band, expected salary, shifts, joining availability, overtime willingness.
-  6. *Resume Upload & Consent*: Optional resume upload (PDF/DOC/DOCX up to 5 MB), statutory privacy notice, voluntary consent, and pre-submission review summary.
+  6. *Resume Upload & Consent*: Optional resume upload (PDF/DOC/DOCX up to 1 MB), statutory privacy notice, voluntary consent, and pre-submission review summary.
 - **Unique Registration ID**: Generates an official reference ID (`DMIC-YYYY-XXXXXX`) with receipt print/download.
 - **Duplicate Detection**: Transparent idempotency and duplicate mobile number tracking without leaking existing registration status to public visitors.
 
@@ -149,11 +149,15 @@ npm test
 ### Creating Authorized Administrator Accounts in Supabase
 1. In your Supabase Dashboard, navigate to **Authentication -> Users**.
 2. Click **Add User** -> **Create User**.
-3. Enter the office administrator's official email (e.g., `admin@office.in`) and a secure password.
-4. Toggle **Auto Confirm User** to `ON`.
-5. Once created, the administrator can log in via `/admin/login`.
+3. Enter the office administrator's official government/office email address and a strong, unique password (min 12 characters with mixed case, numbers, and symbols).
+4. In **User Metadata**, optionally assign a role:
+   - `{"role": "super_admin"}`: Full constituency portal administration, schema oversight, and audit export.
+   - `{"role": "office_admin"}`: Daily candidate review, pipeline filtering, follow-up status updates, and employer referrals.
+   - `{"role": "data_entry"}`: Read and record assistance.
+5. Toggle **Auto Confirm User** to `ON`.
+6. Once created, the authorized staff member can log in via `/admin/login`.
 
-*(Note: During development and staging review, the system includes built-in authorized demo credentials: `admin@bidkin-portal.gov.in` / `Admin@12345` with instant auto-fill button on `/admin/login`)*.
+*(Security Notice: All demo/mock credentials have been strictly purged from this codebase. Only authenticated users provisioned directly in your Supabase Auth instance can access administrative tools).*
 
 ---
 

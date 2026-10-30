@@ -117,10 +117,16 @@ export const PublicNavbar: React.FC = () => {
         
         {/* Brand & Title Group */}
         <Link to="/" className="flex items-center gap-2.5 sm:gap-3.5 group min-w-0">
-          {/* Logo Badge */}
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-navy-900 via-navy-800 to-navy-950 text-white flex flex-col items-center justify-center font-extrabold shadow-md border border-navy-700 group-hover:border-saffron-500/60 transition-all shrink-0">
-            <span className="text-saffron-400 text-sm sm:text-base leading-none">D</span>
-            <span className="text-[9px] sm:text-[10px] tracking-wider text-slate-300 leading-tight">MIC</span>
+          {/* Logo Badge in Round Shape */}
+          <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-white p-1 shadow-md border-2 border-saffron-500/80 group-hover:border-saffron-500 group-hover:scale-105 transition-all duration-200 shrink-0 flex items-center justify-center overflow-hidden">
+            <img 
+              src="/dmic-logo.png" 
+              alt="DMIC Logo" 
+              className="w-full h-full object-contain rounded-full"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/images/DMIC Logo.png';
+              }}
+            />
           </div>
 
           {/* Titles */}

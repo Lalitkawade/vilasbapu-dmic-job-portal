@@ -11,7 +11,7 @@ import {
   EXPERIENCE_BANDS,
   FOLLOW_UP_STATUS_OPTIONS 
 } from '../../data/catalogData';
-import { BIDKIN_VILLAGES, TALUKAS } from '../../data/villagesData';
+import { BIDKIN_VILLAGES, TALUKAS, getVillagesByTaluka } from '../../data/villagesData';
 import { Filter, RotateCcw, X, Check } from 'lucide-react';
 
 interface CandidateFilterPanelProps {
@@ -65,25 +65,6 @@ export const CandidateFilterPanel: React.FC<CandidateFilterPanelProps> = ({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-        {/* Village Filter */}
-        <div>
-          <label className="block font-semibold text-slate-700 uppercase mb-1">
-            {t('village')}
-          </label>
-          <select
-            value={filters.village}
-            onChange={e => setFilters(prev => ({ ...prev, village: e.target.value }))}
-            className="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs bg-white"
-          >
-            <option value="">{language === 'mr' ? '-- सर्व गावे --' : '-- All Villages --'}</option>
-            {BIDKIN_VILLAGES.map((v, i) => (
-              <option key={i} value={language === 'mr' ? v.name_mr : v.name_en}>
-                {language === 'mr' ? v.name_mr : v.name_en}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Taluka Filter */}
         <div>
           <label className="block font-semibold text-slate-700 uppercase mb-1">
@@ -91,13 +72,43 @@ export const CandidateFilterPanel: React.FC<CandidateFilterPanelProps> = ({
           </label>
           <select
             value={filters.taluka}
-            onChange={e => setFilters(prev => ({ ...prev, taluka: e.target.value }))}
-            className="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs bg-white"
+            onChange={e => {
+              const newTaluka = e.target.value;
+              setFilters(prev => ({ 
+                ...prev, 
+                taluka: newTaluka, 
+                village: '' // reset village if taluka changes
+              }));
+            }}
+            className="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs bg-white font-medium"
           >
             <option value="">{language === 'mr' ? '-- सर्व तालुके --' : '-- All Talukas --'}</option>
             {TALUKAS.map(tItem => (
               <option key={tItem.id} value={language === 'mr' ? tItem.name_mr : tItem.name_en}>
                 {language === 'mr' ? tItem.name_mr : tItem.name_en}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Village Filter (Filtered by selected Taluka) */}
+        <div>
+          <label className="block font-semibold text-slate-700 uppercase mb-1">
+            {t('village')} {filters.taluka ? `(${filters.taluka})` : ''}
+          </label>
+          <select
+            value={filters.village}
+            onChange={e => setFilters(prev => ({ ...prev, village: e.target.value }))}
+            className="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs bg-white font-medium"
+          >
+            <option value="">
+              {filters.taluka 
+                ? (language === 'mr' ? `-- ${filters.taluka} मधील सर्व गावे --` : `-- All in ${filters.taluka} --`)
+                : (language === 'mr' ? '-- सर्व गावे --' : '-- All Villages --')}
+            </option>
+            {(filters.taluka ? getVillagesByTaluka(filters.taluka) : BIDKIN_VILLAGES).map((v, i) => (
+              <option key={i} value={language === 'mr' ? v.name_mr : v.name_en}>
+                {language === 'mr' ? v.name_mr : v.name_en}
               </option>
             ))}
           </select>

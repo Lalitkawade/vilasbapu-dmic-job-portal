@@ -12,27 +12,32 @@ export const isLiveSupabaseConfigured =
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ============================================================================
-// RESILIENT CANDIDATE SERVICE (SUPABASE LIVE + LOCAL PERSISTENCE ADAPTER)
+// RESILIENT CANDIDATE SERVICE (SUPABASE LIVE + SAFE IN-MEMORY ADAPTER)
+// Sensitive candidate PII is never persisted to client browser disk (localStorage).
 // ============================================================================
 
 const LOCAL_STORAGE_KEY = 'dmic_registered_candidates';
 const LOCAL_FOLLOWUPS_KEY = 'dmic_candidate_followups';
 
+// Purge any legacy unencrypted candidate data from client browser localStorage
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    window.localStorage.removeItem(LOCAL_STORAGE_KEY);
+    window.localStorage.removeItem(LOCAL_FOLLOWUPS_KEY);
+  } catch {
+    // Ignore storage errors in restricted browser contexts
+  }
+}
+
+// In-memory isolated storage for testing and offline development fallback
 const inMemoryStorage: Record<string, string> = {};
 
 function safeGetItem(key: string): string | null {
-  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
-    return window.localStorage.getItem(key);
-  }
   return inMemoryStorage[key] || null;
 }
 
 function safeSetItem(key: string, value: string): void {
-  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
-    window.localStorage.setItem(key, value);
-  } else {
-    inMemoryStorage[key] = value;
-  }
+  inMemoryStorage[key] = value;
 }
 
 function getLocalCandidates(): CandidateProfile[] {
@@ -40,7 +45,7 @@ function getLocalCandidates(): CandidateProfile[] {
     const data = safeGetItem(LOCAL_STORAGE_KEY);
     return data ? JSON.parse(data) : [];
   } catch (err) {
-    console.error('Failed to read local candidates:', err);
+    console.error('Failed to read in-memory candidates:', err);
     return [];
   }
 }
@@ -49,7 +54,7 @@ function saveLocalCandidates(candidates: CandidateProfile[]) {
   try {
     safeSetItem(LOCAL_STORAGE_KEY, JSON.stringify(candidates));
   } catch (err) {
-    console.error('Failed to save local candidates:', err);
+    console.error('Failed to save in-memory candidates:', err);
   }
 }
 
@@ -145,72 +150,11 @@ export async function submitCandidateRegistration(payload: CandidateSubmissionPa
       });
 
       if (!error && data) {
-        // Also sync local cache for fast offline display
-        const newLocalCandidate: CandidateProfile = {
-          id: data.registration_number,
-          registration_number: data.registration_number,
-          full_name: payload.full_name,
-          mobile_number: payload.mobile_number,
-          normalized_mobile_number: payload.mobile_number.replace(/\D/g, '').slice(-10),
-          alternate_mobile_number: payload.alternate_mobile_number,
-          age: payload.age,
-          village: payload.village,
-          taluka: payload.taluka,
-          district: payload.district,
-          pin_code: payload.pin_code,
-          current_location: payload.current_location,
-          willing_to_commute: payload.willing_to_commute,
-          willing_to_relocate: payload.willing_to_relocate,
-          highest_qualification_id: payload.highest_qualification_id,
-          qualification_specialization: payload.qualification_specialization,
-          passing_year: payload.passing_year,
-          additional_qualifications: payload.additional_qualifications,
-          certifications_text: payload.certifications_text,
-          professional_licenses: payload.professional_licenses,
-          computer_proficiency_id: payload.computer_proficiency_id,
-          experience_category: payload.experience_category,
-          total_experience_band: payload.total_experience_band,
-          total_experience_months: payload.total_experience_months,
-          previous_designation: payload.previous_designation,
-          previous_industry_id: payload.previous_industry_id,
-          previous_employer: payload.previous_employer,
-          relevant_skills_gained: payload.relevant_skills_gained,
-          previous_responsibilities: payload.previous_responsibilities,
-          notice_period_id: payload.notice_period_id,
-          earliest_joining_date: payload.earliest_joining_date,
-          expected_salary_band_id: payload.expected_salary_band_id,
-          employment_type_id: payload.employment_type_id,
-          shift_preference_id: payload.shift_preference_id,
-          joining_availability_id: payload.joining_availability_id,
-          preferred_work_location: payload.preferred_work_location,
-          willing_overtime: payload.willing_overtime || false,
-          languages: payload.languages || ['Marathi'],
-          resume_storage_path: resumePath,
-          resume_original_name: resumeName,
-          resume_size_bytes: resumeSize,
-          resume_mime_type: resumeMime,
-          consent_given: payload.consent_given,
-          consent_timestamp: new Date().toISOString(),
-          privacy_notice_version: payload.privacy_notice_version,
-          registration_source: 'public_web',
-          follow_up_status: 'new',
-          is_duplicate_flag: data.is_duplicate || false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          employment_levels: payload.employment_level_ids,
-          job_roles: payload.job_role_ids,
-          skills: payload.skill_ids,
-          other_skills: payload.other_skills,
-          industries: payload.industry_ids,
-        };
-        const currentLocals = getLocalCandidates();
-        saveLocalCandidates([newLocalCandidate, ...currentLocals]);
-
         return data;
       }
-      console.warn('Supabase RPC returned error, using local fallback:', error?.message);
+      console.warn('Supabase RPC returned error:', error?.message);
     } catch (e) {
-      console.warn('Supabase connection error, proceeding with resilient storage:', e);
+      console.warn('Supabase connection error:', e);
     }
   }
 
@@ -345,7 +289,7 @@ export async function updateCandidateStatus(
             candidate_id: candidateId,
             status: newStatus,
             internal_note: internalNote.trim(),
-            created_by: 'office_admin',
+            created_by: 'admin',
           });
         }
         return true;
@@ -374,7 +318,7 @@ export async function updateCandidateStatus(
         candidate_id: candidateId,
         status: newStatus,
         internal_note: internalNote.trim(),
-        created_by: 'office_admin',
+        created_by: 'admin',
         created_at: new Date().toISOString(),
       });
       safeSetItem(LOCAL_FOLLOWUPS_KEY, JSON.stringify(notes));

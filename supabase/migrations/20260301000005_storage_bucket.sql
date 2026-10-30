@@ -8,7 +8,7 @@ VALUES (
     'candidate-resumes',
     'candidate-resumes',
     false, -- STRICTLY PRIVATE BUCKET: No direct public URL access
-    5242880, -- 5 MB max limit
+    1048576, -- 1 MB max limit
     ARRAY[
         'application/pdf',
         'application/msword',
@@ -17,7 +17,7 @@ VALUES (
 )
 ON CONFLICT (id) DO UPDATE SET
     public = false,
-    file_size_limit = 5242880,
+    file_size_limit = 1048576,
     allowed_mime_types = ARRAY[
         'application/pdf',
         'application/msword',
@@ -25,6 +25,7 @@ ON CONFLICT (id) DO UPDATE SET
     ]::text[];
 
 -- Policy 1: Anonymous candidates can upload (INSERT) their own resume during registration
+DROP POLICY IF EXISTS "Allow public resume upload" ON storage.objects;
 CREATE POLICY "Allow public resume upload"
 ON storage.objects FOR INSERT
 TO anon, authenticated
@@ -33,6 +34,7 @@ WITH CHECK (
 );
 
 -- Policy 2: Strictly restrict downloading (SELECT) to authenticated administrators
+DROP POLICY IF EXISTS "Allow authenticated admins to read resumes" ON storage.objects;
 CREATE POLICY "Allow authenticated admins to read resumes"
 ON storage.objects FOR SELECT
 TO authenticated
@@ -41,6 +43,7 @@ USING (
 );
 
 -- Policy 3: Allow authenticated admins to delete resumes if requested by candidate
+DROP POLICY IF EXISTS "Allow authenticated admins to delete resumes" ON storage.objects;
 CREATE POLICY "Allow authenticated admins to delete resumes"
 ON storage.objects FOR DELETE
 TO authenticated

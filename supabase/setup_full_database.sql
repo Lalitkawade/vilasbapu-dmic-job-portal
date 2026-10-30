@@ -759,73 +759,95 @@ ALTER TABLE public.notice_period_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.computer_proficiency_options ENABLE ROW LEVEL SECURITY;
 
 -- 1. REFERENCE CATALOGS: Public Read Access for Active Records
+DROP POLICY IF EXISTS "Public can view active qualifications" ON public.qualifications;
 CREATE POLICY "Public can view active qualifications" ON public.qualifications
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active employment levels" ON public.employment_levels;
 CREATE POLICY "Public can view active employment levels" ON public.employment_levels
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active job departments" ON public.job_departments;
 CREATE POLICY "Public can view active job departments" ON public.job_departments
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active job roles" ON public.job_roles;
 CREATE POLICY "Public can view active job roles" ON public.job_roles
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active skills" ON public.skills;
 CREATE POLICY "Public can view active skills" ON public.skills
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active industries" ON public.industries;
 CREATE POLICY "Public can view active industries" ON public.industries
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active salary bands" ON public.salary_bands;
 CREATE POLICY "Public can view active salary bands" ON public.salary_bands
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active shift preferences" ON public.shift_preferences;
 CREATE POLICY "Public can view active shift preferences" ON public.shift_preferences
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active employment types" ON public.employment_types;
 CREATE POLICY "Public can view active employment types" ON public.employment_types
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active joining availability" ON public.joining_availability_options;
 CREATE POLICY "Public can view active joining availability" ON public.joining_availability_options
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active notice periods" ON public.notice_period_options;
 CREATE POLICY "Public can view active notice periods" ON public.notice_period_options
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
+DROP POLICY IF EXISTS "Public can view active computer proficiency" ON public.computer_proficiency_options;
 CREATE POLICY "Public can view active computer proficiency" ON public.computer_proficiency_options
     FOR SELECT TO anon, authenticated USING (is_active = true);
 
 -- 2. CANDIDATE PROFILES & RELATIONSHIPS:
 -- STRICTLY DENIED TO ANONYMOUS USERS (NO PUBLIC SELECT, UPDATE, DELETE).
 -- Accessible ONLY to Authenticated Office Administrators (auth.role() = 'authenticated').
+DROP POLICY IF EXISTS "Admins can view all candidate profiles" ON public.candidate_profiles;
 CREATE POLICY "Admins can view all candidate profiles" ON public.candidate_profiles
     FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins can update candidate profiles" ON public.candidate_profiles;
 CREATE POLICY "Admins can update candidate profiles" ON public.candidate_profiles
     FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Admins can view candidate employment levels" ON public.candidate_employment_levels;
 CREATE POLICY "Admins can view candidate employment levels" ON public.candidate_employment_levels
     FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins can view candidate job roles" ON public.candidate_job_roles;
 CREATE POLICY "Admins can view candidate job roles" ON public.candidate_job_roles
     FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins can view candidate skills" ON public.candidate_skills;
 CREATE POLICY "Admins can view candidate skills" ON public.candidate_skills
     FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins can view candidate industries" ON public.candidate_industries;
 CREATE POLICY "Admins can view candidate industries" ON public.candidate_industries
     FOR SELECT TO authenticated USING (true);
 
 -- 3. FOLLOW-UPS & AUDIT LOGS:
+DROP POLICY IF EXISTS "Admins can view followups" ON public.candidate_followups;
 CREATE POLICY "Admins can view followups" ON public.candidate_followups
     FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins can insert followups" ON public.candidate_followups;
 CREATE POLICY "Admins can insert followups" ON public.candidate_followups
     FOR INSERT TO authenticated WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Admins can view audit logs" ON public.administrative_audit_log;
 CREATE POLICY "Admins can view audit logs" ON public.administrative_audit_log
     FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins can insert audit logs" ON public.administrative_audit_log;
 CREATE POLICY "Admins can insert audit logs" ON public.administrative_audit_log
     FOR INSERT TO authenticated WITH CHECK (true);
 
@@ -1146,7 +1168,7 @@ VALUES (
     'candidate-resumes',
     'candidate-resumes',
     false, -- STRICTLY PRIVATE BUCKET: No direct public URL access
-    5242880, -- 5 MB max limit
+    1048576, -- 1 MB max limit
     ARRAY[
         'application/pdf',
         'application/msword',
@@ -1155,7 +1177,7 @@ VALUES (
 )
 ON CONFLICT (id) DO UPDATE SET
     public = false,
-    file_size_limit = 5242880,
+    file_size_limit = 1048576,
     allowed_mime_types = ARRAY[
         'application/pdf',
         'application/msword',
@@ -1163,6 +1185,7 @@ ON CONFLICT (id) DO UPDATE SET
     ]::text[];
 
 -- Policy 1: Anonymous candidates can upload (INSERT) their own resume during registration
+DROP POLICY IF EXISTS "Allow public resume upload" ON storage.objects;
 CREATE POLICY "Allow public resume upload"
 ON storage.objects FOR INSERT
 TO anon, authenticated
@@ -1171,6 +1194,7 @@ WITH CHECK (
 );
 
 -- Policy 2: Strictly restrict downloading (SELECT) to authenticated administrators
+DROP POLICY IF EXISTS "Allow authenticated admins to read resumes" ON storage.objects;
 CREATE POLICY "Allow authenticated admins to read resumes"
 ON storage.objects FOR SELECT
 TO authenticated
@@ -1179,6 +1203,7 @@ USING (
 );
 
 -- Policy 3: Allow authenticated admins to delete resumes if requested by candidate
+DROP POLICY IF EXISTS "Allow authenticated admins to delete resumes" ON storage.objects;
 CREATE POLICY "Allow authenticated admins to delete resumes"
 ON storage.objects FOR DELETE
 TO authenticated

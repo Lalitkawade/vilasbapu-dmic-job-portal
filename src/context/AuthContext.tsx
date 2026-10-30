@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isLiveSupabaseConfigured } from '../lib/supabase';
 
-interface AdminUser {
+export interface AdminUser {
   id: string;
   email: string;
-  role: string;
+  role: 'admin';
 }
 
 interface AuthContextType {
@@ -22,7 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Check initial session
+    // Check initial active Supabase session
     const checkSession = async () => {
       try {
         if (isLiveSupabaseConfigured) {
@@ -30,21 +30,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (session?.user) {
             setUser({
               id: session.user.id,
-              email: session.user.email || 'admin@office.in',
+              email: session.user.email || '',
               role: 'admin',
             });
             setIsLoading(false);
             return;
           }
         }
-
-        // Check local persisted admin session
-        const localAdmin = localStorage.getItem('dmic_admin_session');
-        if (localAdmin) {
-          setUser(JSON.parse(localAdmin));
-        }
       } catch (err) {
-        console.error('Error checking auth session:', err);
+        console.error('Error verifying administrative session:', err);
       } finally {
         setIsLoading(false);
       }
@@ -57,13 +51,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           setUser({
             id: session.user.id,
-            email: session.user.email || 'admin@office.in',
+            email: session.user.email || '',
             role: 'admin',
           });
         } else {
-          // Keep local session if logged in locally
-          const localAdmin = localStorage.getItem('dmic_admin_session');
-          if (!localAdmin) setUser(null);
+          setUser(null);
         }
       });
 
@@ -76,51 +68,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
 
-    // 1. Try Supabase Auth if configured
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Authenticate exclusively through Supabase Auth
     if (isLiveSupabaseConfigured) {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email,
+          email: cleanEmail,
           password,
         });
 
         if (!error && data?.user) {
           const adminUser: AdminUser = {
             id: data.user.id,
-            email: data.user.email || email,
+            email: data.user.email || cleanEmail,
             role: 'admin',
           };
           setUser(adminUser);
-          localStorage.setItem('dmic_admin_session', JSON.stringify(adminUser));
           setIsLoading(false);
           return { success: true };
         }
-      } catch (e: any) {
-        console.warn('Supabase auth failed, testing administrator fallback:', e?.message);
-      }
-    }
 
-    // 2. Built-in authorized administrator credentials for deployment review & offline verification
-    // Standard office administrator credential
-    if (
-      (email.trim().toLowerCase() === 'admin@bidkin-portal.gov.in' || email.trim().toLowerCase() === 'admin@office.in') &&
-      password === 'Admin@12345'
-    ) {
-      const adminUser: AdminUser = {
-        id: 'admin-constituency-office',
-        email: email.trim().toLowerCase(),
-        role: 'admin',
-      };
-      setUser(adminUser);
-      localStorage.setItem('dmic_admin_session', JSON.stringify(adminUser));
-      setIsLoading(false);
-      return { success: true };
+        setIsLoading(false);
+        return { 
+          success: false, 
+          error: error?.message || 'अवैध ईमेल किंवा पासवर्ड. कृपया अधिकृत क्रेडेंशियल्स वापरा / Invalid email or password.' 
+        };
+      } catch (e: any) {
+        setIsLoading(false);
+        return { 
+          success: false, 
+          error: 'ऑथेंटिकेशन सेवा संपर्क त्रुटी / Authentication service error: ' + (e?.message || 'Connection failed') 
+        };
+      }
     }
 
     setIsLoading(false);
     return { 
       success: false, 
-      error: 'अवैध ईमेल किंवा पासवर्ड. कृपया अधिकृत क्रेडेंशियल्स वापरा / Invalid email or password. Please use authorized credentials.' 
+      error: 'प्रशासकीय लॉगिनसाठी Supabase ऑथेंटिकेशन सेवा कॉन्फिगर केलेली असणे आवश्यक आहे. / Administrative login requires a configured authentication backend.' 
     };
   };
 
@@ -129,10 +115,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await supabase.auth.signOut();
       } catch (err) {
-        console.warn(err);
+        console.warn('Sign out error:', err);
       }
     }
-    localStorage.removeItem('dmic_admin_session');
     setUser(null);
   };
 

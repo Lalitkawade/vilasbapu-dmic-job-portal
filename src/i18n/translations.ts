@@ -123,10 +123,10 @@ export const translations = {
 
     // Section I
     secIResumeTitle: 'विभाग आय: बायोडेटा / रेझ्युमे अपलोड (ऐच्छिक)',
-    secIResumeDesc: 'आपल्याकडे तयार बायोडेटा असल्यास PDF किंवा Word फाईल अपलोड करा (कमाल ५ MB). बायोडेटा नसल्यास ही पायरी वगळू शकता.',
+    secIResumeDesc: 'आपल्याकडे तयार बायोडेटा असल्यास PDF किंवा Word फाईल अपलोड करा (कमाल १ MB). बायोडेटा नसल्यास ही पायरी वगळू शकता.',
     uploadResumeButton: 'फाईल निवडा (PDF/DOC)',
     fileSelected: 'निवडलेली फाईल',
-    maxSizeNotice: 'फक्त PDF, DOC किंवा DOCX फाईल्स स्वीकारल्या जातील. कमाल आकार ५ MB.',
+    maxSizeNotice: 'फक्त PDF, DOC किंवा DOCX फाईल्स स्वीकारल्या जातील. कमाल आकार १ MB.',
 
     // Section J
     secJConsentTitle: 'विभाग ज: संमती व नियम (Consent & Privacy)',
@@ -318,10 +318,10 @@ export const translations = {
 
     // Section I
     secIResumeTitle: 'Section I: Resume / Biodata Upload (Optional)',
-    secIResumeDesc: 'If you have a prepared resume, upload it here as a PDF or Word document (Max 5 MB). You can skip this step if you do not have one.',
+    secIResumeDesc: 'If you have a prepared resume, upload it here as a PDF or Word document (Max 1 MB). You can skip this step if you do not have one.',
     uploadResumeButton: 'Choose File (PDF/DOC)',
     fileSelected: 'Selected File',
-    maxSizeNotice: 'PDF, DOC, and DOCX formats supported. Maximum size limit is 5 MB.',
+    maxSizeNotice: 'PDF, DOC, and DOCX formats supported. Maximum size limit is 1 MB.',
 
     // Section J
     secJConsentTitle: 'Section J: Consent and Privacy Notice',

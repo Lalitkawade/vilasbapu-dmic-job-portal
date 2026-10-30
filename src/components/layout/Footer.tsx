@@ -42,8 +42,15 @@ export const Footer: React.FC = () => {
         {/* Col 1: Initiative info */}
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded bg-saffron-500 text-white font-bold flex items-center justify-center text-sm shrink-0">
-              DMIC
+            <div className="w-9 h-9 rounded-full bg-white p-0.5 border border-saffron-400/80 shadow-xs flex items-center justify-center overflow-hidden shrink-0">
+              <img 
+                src="/dmic-logo.png" 
+                alt="DMIC Logo" 
+                className="w-full h-full object-contain rounded-full"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/images/DMIC Logo.png';
+                }}
+              />
             </div>
             <div>
               <span className="text-[11px] font-bold text-saffron-400 block leading-tight">
@@ -125,17 +132,19 @@ export const Footer: React.FC = () => {
 
       {/* Bottom Bar: Copyright & Developer Attribution */}
       <div className="border-t border-navy-900 bg-navy-950 py-4 px-4 sm:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
           <div>
             © {new Date().getFullYear()} {officeName}. All rights reserved.
           </div>
-          <div className="text-[11px] text-slate-500 flex items-center gap-1.5 font-normal">
-            <span>Design & Develop by</span>
-            <span className="text-slate-400 font-medium">Lalit Kawade</span>
-            <span className="text-slate-700">•</span>
+          <div className="text-[11px] text-slate-300 flex items-center gap-1.5 font-normal transition-all duration-200 group cursor-default">
+            <span className="text-slate-300 group-hover:text-slate-100 transition-colors">Design & Develop by</span>
+            <span className="text-white font-semibold tracking-wide group-hover:text-saffron-300 transition-colors drop-shadow-xs">
+              Lalit Kawade
+            </span>
+            <span className="text-slate-400 group-hover:text-slate-200 transition-colors">•</span>
             <a 
               href="tel:9270138287" 
-              className="text-slate-400 hover:text-slate-300 transition"
+              className="text-slate-200 font-semibold group-hover:text-saffron-400 transition-colors hover:underline tracking-wider"
               title="Contact: 9270138287"
             >
               9270138287

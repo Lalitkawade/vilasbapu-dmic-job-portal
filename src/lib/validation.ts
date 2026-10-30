@@ -53,48 +53,49 @@ export const candidateRegistrationSchema = z.object({
     .string()
     .min(1, { message: 'कृपया आपले सर्वोच्च शिक्षण निवडा / Please select highest qualification' }),
   
-  qualification_specialization: z.string().optional(),
+  qualification_specialization: z.string().max(200).optional(),
   passing_year: z.number().optional().nullable(),
-  additional_qualifications: z.string().optional(),
-  certifications_text: z.string().optional(),
-  professional_licenses: z.string().optional(),
-  computer_proficiency_id: z.string().optional(),
+  additional_qualifications: z.string().max(500).optional(),
+  certifications_text: z.string().max(500).optional(),
+  professional_licenses: z.string().max(500).optional(),
+  computer_proficiency_id: z.string().max(100).optional(),
 
   // Section C: Levels
   employment_level_ids: z
-    .array(z.string())
-    .min(1, { message: 'कृपया किमान एक पसंतीची नोकरी पातळी निवडा / Please select at least one employment level' }),
+    .array(z.string().max(50))
+    .min(1, { message: 'कृपया किमान एक पसंतीची नोकरी पातळी निवडा / Please select at least one employment level' })
+    .max(20),
 
   // Section D: Roles
-  job_role_ids: z.array(z.string()).optional(),
+  job_role_ids: z.array(z.string().max(50)).max(50).optional(),
 
   // Section E: Skills
-  skill_ids: z.array(z.string()).optional(),
-  other_skills: z.array(z.string()).optional(),
+  skill_ids: z.array(z.string().max(50)).max(100).optional(),
+  other_skills: z.array(z.string().max(100)).max(30).optional(),
 
   // Section F: Experience
   experience_category: z.enum(['fresher', 'experienced', 'apprentice']),
-  total_experience_band: z.string(),
+  total_experience_band: z.string().max(50),
   total_experience_months: z.number().optional().nullable(),
-  previous_designation: z.string().optional(),
-  previous_industry_id: z.string().optional(),
-  previous_employer: z.string().optional(),
-  relevant_skills_gained: z.string().optional(),
-  previous_responsibilities: z.string().optional(),
-  notice_period_id: z.string().optional(),
-  earliest_joining_date: z.string().optional(),
+  previous_designation: z.string().max(150).optional(),
+  previous_industry_id: z.string().max(50).optional(),
+  previous_employer: z.string().max(150).optional(),
+  relevant_skills_gained: z.string().max(500).optional(),
+  previous_responsibilities: z.string().max(1000).optional(),
+  notice_period_id: z.string().max(50).optional(),
+  earliest_joining_date: z.string().max(30).optional(),
 
   // Section G: Industries
-  industry_ids: z.array(z.string()).optional(),
+  industry_ids: z.array(z.string().max(50)).max(30).optional(),
 
   // Section H: Salary & Preferences
-  expected_salary_band_id: z.string().optional(),
-  employment_type_id: z.string().optional(),
-  shift_preference_id: z.string().optional(),
-  joining_availability_id: z.string().optional(),
-  preferred_work_location: z.string().optional(),
+  expected_salary_band_id: z.string().max(50).optional(),
+  employment_type_id: z.string().max(50).optional(),
+  shift_preference_id: z.string().max(50).optional(),
+  joining_availability_id: z.string().max(50).optional(),
+  preferred_work_location: z.string().max(150).optional(),
   willing_overtime: z.boolean().optional(),
-  languages: z.array(z.string()).optional(),
+  languages: z.array(z.string().max(50)).max(20).optional(),
 
   // Section J: Consent
   consent_given: z.literal(true, {
